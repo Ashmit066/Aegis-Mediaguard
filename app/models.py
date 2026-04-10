@@ -186,3 +186,55 @@ class LedgerVerifyResult(BaseModel):
     entry_count: int
     first_broken_seq: Optional[int] = None
     message: str
+
+
+# ---------------------------------------------------------------------------
+# Case store — persists analysis results for the agent layer
+# ---------------------------------------------------------------------------
+
+class StoredCase(BaseModel):
+    """
+    A completed analysis case, stored in memory after POST /reports/analyze.
+    The verdict field is the authoritative output of the enforcement pipeline
+    and is immutable once written.
+    """
+
+    case_id: str
+    report_id: str
+    platform: str
+    geo_country: str
+    media_type: str
+    event_name: str
+    uploader_handle: str
+    discovered_url: str
+    verdict: VerdictType
+    severity_score: int
+    matched_asset_id: Optional[str] = None
+    combined_confidence: float
+    watermark_detected: bool
+    is_authorized: Optional[bool] = None
+    rights_reasons: list[str] = Field(default_factory=list)
+    reasoning: list[str] = Field(default_factory=list)
+    analyzed_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Agent summary response model
+# ---------------------------------------------------------------------------
+
+class AgentSummary(BaseModel):
+    """
+    Structured triage summary produced by the agent layer.
+    This is advisory output only — it does not alter the stored verdict.
+    """
+
+    case_id: str
+    verdict: str
+    severity_score: int
+    matched_asset_id: Optional[str] = None
+    urgency_label: str
+    summary: str
+    key_evidence: list[str]
+    recommended_action: str
+    draft_takedown_notice: Optional[str] = None
+    prior_related_case_count: int = 0

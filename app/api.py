@@ -1,6 +1,12 @@
 """
 app/api.py
 FastAPI router definitions for all Aegis MediaGuard endpoints.
+
+Changes from v1:
+- Added _CASE_STORE (in-memory dict) that persists every analysis result.
+- POST /reports/analyze now writes a case entry after issuing the verdict.
+- Added GET /cases/{case_id}/agent-summary (new agentic triage endpoint).
+- All original endpoints are unchanged.
 """
 
 from __future__ import annotations
@@ -9,6 +15,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.config import settings
 from app.models import (
+    AgentSummary,
     AnalysisVerdict,
     EvidenceEvent,
     IncomingReport,
@@ -26,6 +33,33 @@ from risk.verdicts import issue_verdict
 from workers.sandbox import run_match_in_sandbox
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# In-memory case store
+# Keyed by report_id (== case_id).  Each value is a raw dict containing the
+# objects produced at each pipeline stage so the agent layer can read them
+# without re-running any logic.
+# ---------------------------------------------------------------------------
+_CASE_STORE: dict[str, dict] = {}
+
+
+def _persist_case(
+    report: IncomingReport,
+    match,
+    rights,
+    verdict: AnalysisVerdict,
+    asset_title: str = "Unknown",
+    rights_holder: str = "Unknown",
+) -> None:
+    """Write a completed analysis to the case store.  Never raises."""
+    _CASE_STORE[verdict.report_id] = {
+        "report": report,
+        "match": match,
+        "rights_decision": rights,
+        "verdict": verdict,
+        "asset_title": asset_title,
+        "rights_holder": rights_holder,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +97,7 @@ def analyze_report(raw_body: dict) -> AnalysisVerdict:
     3. Rights evaluation
     4. Verdict issuance
     5. Ledger recording at each stage
+    6. Case persistence (new) -- stores result for agent retrieval
     """
     # --- Stage 1: Schema validation ---
     try:
@@ -121,10 +156,14 @@ def analyze_report(raw_body: dict) -> AnalysisVerdict:
 
     # --- Stage 3: Rights evaluation ---
     rights = None
+    asset_title = "Unknown"
+    rights_holder_name = "Unknown"
     if match.matched_asset_id:
         asset = get_asset_by_id(match.matched_asset_id)
         if asset:
             rights = evaluate_rights(report, asset)
+            asset_title = asset.title
+            rights_holder_name = asset.rights_holder
             append_event(
                 EvidenceEvent.RIGHTS_DECIDED,
                 {
@@ -144,6 +183,9 @@ def analyze_report(raw_body: dict) -> AnalysisVerdict:
             "severity_score": verdict.severity_score,
         },
     )
+
+    # --- Stage 5: Persist case for agent retrieval ---
+    _persist_case(report, match, rights, verdict, asset_title, rights_holder_name)
 
     return verdict
 
@@ -165,3 +207,47 @@ def verify_ledger() -> LedgerVerifyResult:
     Returns a result indicating whether the chain is intact.
     """
     return verify_chain()
+
+
+# ---------------------------------------------------------------------------
+# Agent triage endpoint
+# ---------------------------------------------------------------------------
+
+@router.get("/cases/{case_id}/agent-summary", response_model=AgentSummary, tags=["agent"])
+def agent_case_summary(case_id: str) -> AgentSummary:
+    """
+    Read-only agentic triage summary for an analyzed case.
+
+    This endpoint:
+    - Reads the stored case from the enforcement pipeline's case store.
+    - Passes structured evidence through policy-gated agent tools.
+    - Returns an advisory triage summary including urgency, recommended
+      action, and a draft takedown notice where appropriate.
+    - Never modifies the stored verdict, rights data, or audit ledger.
+
+    Args:
+        case_id: The report_id returned by POST /reports/analyze.
+
+    Returns:
+        AgentSummary -- advisory output, not authoritative.
+
+    Raises:
+        404: If the case_id is not found in the case store.
+        403: If any internal agent action violates policy (defensive).
+    """
+    if case_id not in _CASE_STORE:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Case '{case_id}' not found. Submit the report first via POST /reports/analyze.",
+        )
+
+    from agent.orchestrator import PolicyViolationError, run_case_summary
+
+    try:
+        summary_dict = run_case_summary(case_id)
+    except PolicyViolationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return AgentSummary(**summary_dict)

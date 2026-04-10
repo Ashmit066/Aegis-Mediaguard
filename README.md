@@ -224,3 +224,128 @@ POST /reports/analyze
 **The ledger is legally credible.** A hash-linked, append-only record with a verify endpoint is exactly what a legal team needs to demonstrate chain of custody in a DMCA takedown. It's also a natural extension point — pipe ledger entries to a blockchain anchor or S3 for immutability guarantees.
 
 **50 tests, all green, out of the box.** Coverage spans schema rejection, geo blocking, expired licenses, live-leak escalation, unknown assets, and ledger integrity. This signals to technical judges that the code is built to survive edge cases, not just the happy path.
+
+---
+
+## Agentic Triage Layer (retrofit)
+
+### Two planes, one system
+
+```
+┌─────────────────────────────────────────────────────┐
+│              ENFORCEMENT PLANE (authoritative)       │
+│  POST /reports/analyze                               │
+│  Schema validation → Fingerprint match → Rights      │
+│  check → Verdict → SHA-256 ledger                   │
+│  Verdict is final.  Ledger is append-only.           │
+└────────────────────────┬────────────────────────────┘
+                         │ reads (never writes)
+┌────────────────────────▼────────────────────────────┐
+│              AGENTIC TRIAGE PLANE (advisory)         │
+│  GET /cases/{case_id}/agent-summary                  │
+│  Policy gate → Evidence tools → LLM stub →           │
+│  Urgency label + Summary + Draft notice              │
+│  Output is advisory.  Cannot alter anything above.   │
+└─────────────────────────────────────────────────────┘
+```
+
+**The enforcement plane decides.** Every verdict, rights check, and ledger entry is produced deterministically by the existing pipeline and cannot be modified by the agent layer.
+
+**The agentic triage plane explains and prioritizes.** It reads the already-produced evidence, produces a human-readable summary, assigns an urgency label, recommends an action, and drafts a takedown notice for human review. It never executes anything.
+
+### Why the agent is assistive, not authoritative
+
+The agent layer sits downstream of every enforcement decision. It has no write access to the case store, the ledger, the asset catalog, or the rights data. The `agent/policy.py` module contains an explicit allow/deny table — any attempted mutation raises a `PolicyViolationError` before reaching any business logic. This means:
+
+- A compromised prompt or hallucinating LLM output cannot change a verdict.
+- The audit ledger remains tamper-evident regardless of agent behavior.
+- The draft takedown notice always carries a `[DRAFT — NOT YET AUTHORIZED FOR SUBMISSION]` marker to prevent accidental automated submission.
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `agent/policy.py` | Explicit allow/deny table for every agent action |
+| `agent/tools.py` | Read-only tools: `get_case_evidence`, `get_asset_details`, `get_rights_explanation`, `get_prior_related_cases`, `draft_takedown_notice` |
+| `agent/llm_stub.py` | Deterministic stub (no API key needed); swap for real LLM later |
+| `agent/orchestrator.py` | Wires policy → tools → stub for the summary endpoint |
+| `agent/prompts.py` | Prompt construction helpers (used when swapping to a real LLM) |
+
+### How to call the agent summary endpoint
+
+**Step 1 — analyze a report** (same as before):
+```bash
+curl -X POST http://localhost:8000/reports/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "report_id": "RPT-DEMO-AGENT-001",
+    "discovered_url": "https://www.tiktok.com/@pirate/nba_finals_stolen",
+    "platform": "tiktok",
+    "geo_country": "US",
+    "detected_at": "2024-07-16T14:32:00",
+    "media_type": "highlight_clip",
+    "claimant_org": "RightsScan AI",
+    "event_name": "NBA Finals 2024",
+    "uploader_handle": "pirate_user99",
+    "extracted_fingerprint": "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6",
+    "extracted_watermark": null,
+    "screenshot_hash": null,
+    "confidence_hint": 0.88
+  }'
+```
+
+**Step 2 — fetch the agent triage summary**:
+```bash
+curl http://localhost:8000/cases/RPT-DEMO-AGENT-001/agent-summary | python3 -m json.tool
+```
+
+Example response:
+```json
+{
+  "case_id": "RPT-DEMO-AGENT-001",
+  "verdict": "suspected_infringement",
+  "severity_score": 85,
+  "matched_asset_id": "ASSET-002",
+  "urgency_label": "HIGH",
+  "summary": "Suspected unauthorized distribution of 'NBA Finals 2024 Highlights' detected on tiktok (region: US). Fingerprint match confidence: 100%. Severity score: 85/100.",
+  "key_evidence": [
+    "Fingerprint match: strong (100% confidence).",
+    "Rights violation: Platform 'tiktok' is NOT authorized; allowed: ['youtube', 'twitter', 'facebook']"
+  ],
+  "recommended_action": "Issue a formal DMCA takedown notice to the platform...",
+  "draft_takedown_notice": "DRAFT TAKEDOWN NOTICE\n====...",
+  "prior_related_case_count": 0
+}
+```
+
+### Demo flow with agent summary
+
+1. `uvicorn app.main:app --reload`
+2. Analyze a pirated clip → verdict: `suspected_infringement`
+3. Fetch agent summary → urgency `HIGH`, draft takedown notice ready for human review
+4. Analyze a live IPL stream → verdict: `urgent_live_leak`
+5. Fetch agent summary → urgency `CRITICAL`, immediate escalation recommended
+6. Confirm `GET /ledger/verify` still passes — agent activity added no ledger entries
+7. Check that calling the agent summary a second time does not change the verdict
+
+### Swapping the LLM stub for a real model
+
+Replace `agent/llm_stub.py`'s `generate()` function with a call to the Claude Messages API:
+
+```python
+import anthropic
+
+def generate(prompt_key: str, evidence: dict) -> dict:
+    from agent.prompts import SYSTEM_PROMPT, build_case_summary_prompt
+    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": build_case_summary_prompt(evidence)}],
+    )
+    import json
+    return json.loads(message.content[0].text)
+```
+
+No other files need to change.
