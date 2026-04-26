@@ -6,8 +6,6 @@ Returns either a validated model or a structured error list.
 
 from __future__ import annotations
 
-from typing import Union
-
 from pydantic import ValidationError
 
 from app.models import IncomingReport

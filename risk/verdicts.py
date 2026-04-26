@@ -6,8 +6,6 @@ This is the decision layer — it maps signals to one of the defined VerdictType
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from app.config import settings
 from app.models import (
     AnalysisVerdict,
@@ -116,7 +114,11 @@ def issue_verdict(
     only_platform_failed = (
         not rights.platform_ok and rights.region_ok and rights.license_valid
     )
-    if only_platform_failed and match.watermark_detected and not match.fingerprint_score == 1.0:
+    if (
+        only_platform_failed
+        and match.watermark_detected
+        and not match.fingerprint_score == 1.0
+    ):
         reasoning.append(
             "Watermark confirmed, but platform is unauthorized — "
             "human review needed to determine intent."
@@ -132,9 +134,7 @@ def issue_verdict(
         )
 
     # --- Suspected infringement (catch-all for rights failure) ---
-    reasoning.append(
-        "Rights check failed — flagged as suspected infringement."
-    )
+    reasoning.append("Rights check failed — flagged as suspected infringement.")
     return AnalysisVerdict(
         report_id=report.report_id,
         verdict=VerdictType.suspected_infringement,

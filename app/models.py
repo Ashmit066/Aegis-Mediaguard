@@ -9,12 +9,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-
+from pydantic import BaseModel, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Enumerations
 # ---------------------------------------------------------------------------
+
 
 class MediaType(str, Enum):
     live_stream = "live_stream"
@@ -45,19 +45,56 @@ class EvidenceEvent(str, Enum):
 
 
 KNOWN_PLATFORMS = {
-    "youtube", "twitter", "instagram", "tiktok", "facebook",
-    "twitch", "reddit", "vimeo", "dailymotion", "unknown"
+    "youtube",
+    "twitter",
+    "instagram",
+    "tiktok",
+    "facebook",
+    "twitch",
+    "reddit",
+    "vimeo",
+    "dailymotion",
+    "hotstar",
+    "jiohotstar",
+    "jiocinema",
+    "sonyliv",
+    "fancode",
+    "skysports",
+    "foxcricket",
+    "paramount",
+    "paramountplus",
+    "unknown",
 }
 
 ISO3166_SAMPLE = {
-    "US", "GB", "IN", "DE", "FR", "JP", "AU", "CA", "BR", "ZA",
-    "NG", "MX", "KR", "IT", "ES", "NL", "PL", "RU", "CN", "SG", "UNKNOWN"
+    "US",
+    "GB",
+    "IN",
+    "DE",
+    "FR",
+    "JP",
+    "AU",
+    "CA",
+    "BR",
+    "ZA",
+    "NG",
+    "MX",
+    "KR",
+    "IT",
+    "ES",
+    "NL",
+    "PL",
+    "RU",
+    "CN",
+    "SG",
+    "UNKNOWN",
 }
 
 
 # ---------------------------------------------------------------------------
 # Incoming telemetry report
 # ---------------------------------------------------------------------------
+
 
 class IncomingReport(BaseModel):
     """
@@ -84,10 +121,7 @@ class IncomingReport(BaseModel):
     @field_validator("platform")
     @classmethod
     def normalize_platform(cls, v: str) -> str:
-        normalized = v.strip().lower()
-        if normalized not in KNOWN_PLATFORMS:
-            return "unknown"
-        return normalized
+        return v.strip().lower()
 
     @field_validator("geo_country")
     @classmethod
@@ -109,6 +143,7 @@ class IncomingReport(BaseModel):
 # Official asset catalog entry
 # ---------------------------------------------------------------------------
 
+
 class OfficialAsset(BaseModel):
     """
     Represents a rights-managed sports media asset in the catalog.
@@ -121,6 +156,7 @@ class OfficialAsset(BaseModel):
     media_type: MediaType
     canonical_fingerprint: str
     watermark_ids: list[str]
+    authorized_uploaders: list[str] = Field(default_factory=list)
     authorized_platforms: list[str]
     authorized_regions: list[str]
     valid_from: datetime
@@ -131,6 +167,7 @@ class OfficialAsset(BaseModel):
 # ---------------------------------------------------------------------------
 # Match result from the identify layer
 # ---------------------------------------------------------------------------
+
 
 class MatchResult(BaseModel):
     matched_asset_id: Optional[str] = None
@@ -145,9 +182,11 @@ class MatchResult(BaseModel):
 # Rights decision from the policy engine
 # ---------------------------------------------------------------------------
 
+
 class RightsDecision(BaseModel):
     is_authorized: bool
     platform_ok: bool
+    uploader_ok: bool = True
     region_ok: bool
     license_valid: bool
     reasons: list[str] = Field(default_factory=list)
@@ -156,6 +195,7 @@ class RightsDecision(BaseModel):
 # ---------------------------------------------------------------------------
 # Final analysis verdict
 # ---------------------------------------------------------------------------
+
 
 class AnalysisVerdict(BaseModel):
     report_id: str
@@ -171,6 +211,7 @@ class AnalysisVerdict(BaseModel):
 # ---------------------------------------------------------------------------
 # Audit ledger entry
 # ---------------------------------------------------------------------------
+
 
 class LedgerEntry(BaseModel):
     seq: int
@@ -191,6 +232,7 @@ class LedgerVerifyResult(BaseModel):
 # ---------------------------------------------------------------------------
 # Case store — persists analysis results for the agent layer
 # ---------------------------------------------------------------------------
+
 
 class StoredCase(BaseModel):
     """
@@ -221,6 +263,7 @@ class StoredCase(BaseModel):
 # ---------------------------------------------------------------------------
 # Agent summary response model
 # ---------------------------------------------------------------------------
+
 
 class AgentSummary(BaseModel):
     """

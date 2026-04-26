@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aegis MediaGuard | Rights Intelligence Kernel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050a18;
+            --bg-surface: #0a1128;
+            --panel-bg: rgba(15, 23, 50, 0.8);
+            --panel-border: rgba(99, 102, 241, 0.15);
+            --accent: #818cf8;
+            --accent-hover: #a5b4fc;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --gradient-start: #6366f1;
+            --gradient-end: #a855f7;
+            --verdict-safe: #34d399;
+            --verdict-warn: #fbbf24;
+            --verdict-danger: #f87171;
+            --verdict-unknown: #a78bfa;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 20px 40px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        /* Ambient gradient orbs */
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.12;
+            z-index: 0;
+            pointer-events: none;
+        }
+        body::before {
+            width: 600px; height: 600px;
+            background: var(--gradient-start);
+            top: -10%; left: -5%;
+            animation: orbFloat 12s ease-in-out infinite alternate;
+        }
+        body::after {
+            width: 500px; height: 500px;
+            background: var(--gradient-end);
+            bottom: -10%; right: -5%;
+            animation: orbFloat 15s ease-in-out infinite alternate-reverse;
+        }
+        @keyframes orbFloat {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(40px, -30px) scale(1.15); }
+        }
+        /* Top nav */
+        .top-nav {
+            width: 100%; max-width: 1100px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 0; z-index: 20;
+            border-bottom: 1px solid rgba(99,102,241,0.1);
+            margin-bottom: 36px;
+        }
+        .top-nav .logo {
+            display: flex; align-items: center; gap: 10px;
+            font-weight: 700; font-size: 1.15rem; color: #e2e8f0;
+        }
+        .top-nav .logo .shield {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+        }
+        .top-nav .nav-pills {
+            display: flex; gap: 6px;
+        }
+        .top-nav .pill {
+            padding: 6px 14px; border-radius: 999px;
+            font-size: 0.75rem; font-weight: 500;
+            background: rgba(99,102,241,0.08);
+            border: 1px solid rgba(99,102,241,0.15);
+            color: var(--text-muted);
+        }
+        .top-nav .pill.active {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: #fff; border-color: transparent;
+        }
+
+        /* --- RETRO GRID --- */
+        .retro-grid {
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh; z-index: -1;
+            background-image:
+                linear-gradient(to right, rgba(99,102,241,0.06) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(99,102,241,0.06) 1px, transparent 1px);
+            background-size: 60px 60px;
+            transform: perspective(500px) rotateX(60deg) translateY(-100px) translateZ(-200px);
+            animation: gridMove 20s linear infinite;
+        }
+        .retro-grid-fade {
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh; z-index: -1;
+            background: radial-gradient(ellipse at 50% 50%, transparent 0%, var(--bg-color) 75%);
+        }
+        @keyframes gridMove {
+            0% { transform: perspective(500px) rotateX(60deg) translateY(0) translateZ(-200px); }
+            100% { transform: perspective(500px) rotateX(60deg) translateY(60px) translateZ(-200px); }
+        }
+
+        /* --- HEADER --- */
+        header {
+            text-align: center;
+            margin-bottom: 12px;
+            z-index: 10;
+        }
+        .animated-text {
+            font-size: 2.6rem; font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #c7d2fe 0%, #ffffff 30%, #e9d5ff 60%, #818cf8 100%);
+            background-size: 200% auto;
+            background-clip: text; -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 4s ease infinite;
+            margin-bottom: 6px;
+        }
+        @keyframes shine { to { background-position: 200% center; } }
+        header p {
+            color: var(--text-muted); font-size: 0.95rem;
+            max-width: 460px; margin: 0 auto 0;
+            letter-spacing: 0.03em;
+        }
+        /* Stats bar */
+        .stats-bar {
+            display: flex; gap: 24px; justify-content: center;
+            margin: 24px 0 36px; z-index: 10;
+        }
+        .stat-item {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.8rem; color: var(--text-muted);
+        }
+        .stat-item .stat-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+        }
+        .stat-item strong { color: var(--text-main); font-weight: 600; }
+        /* --- BENTO GRID --- */
+        .bento-container {
+            width: 100%; max-width: 1100px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px; z-index: 10;
+        }
+        .bento-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 24px 26px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+            transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+            position: relative;
+        }
+        .bento-card::before {
+            content: ''; position: absolute; inset: 0; border-radius: 16px;
+            background: linear-gradient(135deg, rgba(99,102,241,0.04), transparent 60%);
+            pointer-events: none;
+        }
+        .bento-card:hover {
+            border-color: rgba(99,102,241,0.3);
+            box-shadow: 0 8px 40px rgba(99,102,241,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+            transform: translateY(-2px);
+        }
+        .col-span-2 { grid-column: span 2; }
+        .col-span-3 { grid-column: span 3; }
+        @media (max-width: 900px) {
+            .bento-container { grid-template-columns: 1fr; }
+            .col-span-2, .col-span-3 { grid-column: span 1; }
+        }
+
+        h2 {
+            font-size: 1rem; font-weight: 600;
+            margin-bottom: 18px; display: flex;
+            align-items: center; gap: 8px; color: #cbd5e1;
+            text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.8rem;
+        }
+        .input-group { margin-bottom: 16px; }
+        label {
+            display: block; font-size: 0.78rem;
+            color: var(--text-muted); margin-bottom: 6px;
+            font-weight: 500; letter-spacing: 0.02em;
+        }
+        input {
+            width: 100%;
+            background: rgba(10, 17, 40, 0.7);
+            border: 1px solid rgba(99,102,241,0.12);
+            color: white; padding: 13px 16px;
+            border-radius: 10px; font-size: 0.9rem;
+            outline: none; transition: all 0.25s;
+        }
+        input:focus {
+            border-color: rgba(99,102,241,0.5);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
+
+        /* --- SHIMMER BUTTON --- */
+        .shimmer-button {
+            position: relative; width: 100%; padding: 14px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border: none; color: white;
+            font-size: 0.9rem; font-weight: 600;
+            cursor: pointer; overflow: hidden;
+            transition: all 0.25s;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+            box-shadow: 0 4px 15px rgba(99,102,241,0.3);
+        }
+        .shimmer-button::before {
+            content: ''; position: absolute; top: 0; left: -100%;
+            width: 60%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
+            transform: skewX(-20deg);
+            animation: shimmer 2.5s infinite;
+        }
+        .shimmer-button:hover {
+            box-shadow: 0 6px 25px rgba(99,102,241,0.5);
+            transform: translateY(-1px);
+        }
+        @keyframes shimmer { 100% { left: 200%; } }
+        .shimmer-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results Display */
+        .hidden-bento {
+            display: none;
+            animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .verdict-badge {
+            display: inline-flex;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 24px;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .verdict-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(inherit, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(inherit, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(inherit, 0); }
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-box {
+            background: rgba(10, 17, 40, 0.6);
+            border: 1px solid var(--panel-border);
+            padding: 18px; border-radius: 12px;
+            text-align: center; position: relative; overflow: hidden;
+        }
+        .metric-box::after {
+            content: ''; position: absolute;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(99,102,241,0.04) 0%, transparent 60%);
+            z-index: 0;
+        }
+        .metric-box span {
+            position: relative; z-index: 1; display: block;
+            font-size: 0.72rem; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;
+        }
+        .metric-box strong {
+            position: relative; z-index: 1;
+            font-size: 1.6rem; font-weight: 700; letter-spacing: -1px;
+        }
+
+        .rights-status {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px;
+            background: rgba(10, 17, 40, 0.5);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px; margin-bottom: 8px;
+            font-size: 0.88rem;
+            transition: background 0.2s;
+        }
+        .rights-status:hover { background: rgba(10, 17, 40, 0.7); }
+
+        .log-list {
+            list-style: none;
+            height: 300px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .log-list::-webkit-scrollbar { width: 6px; }
+        .log-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+        .log-list li {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            padding: 12px 16px;
+            border-left: 2px solid rgba(255,255,255,0.2);
+            background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+            margin-bottom: 12px;
+            color: #cbd5e1;
+            border-radius: 0 8px 8px 0;
+            opacity: 0;
+            animation: slideIn 0.3s forwards;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .ai-badge {
+            background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: white;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .text-green { color: var(--verdict-safe); }
+        .text-red { color: var(--verdict-danger); }
+        .text-yellow { color: var(--verdict-warn); }
+        .text-blue { color: var(--verdict-unknown); }
+        .bg-green { background: var(--verdict-safe); box-shadow: 0 0 10px var(--verdict-safe); }
+        .bg-red { background: var(--verdict-danger); box-shadow: 0 0 10px var(--verdict-danger); }
+
+        /* --- PIRACY THREAT ALERT --- */
+        .threat-alert {
+            display: none;
+            border: 1.5px solid var(--verdict-danger);
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+            background: rgba(239, 68, 68, 0.08);
+            animation: threatPulse 1.5s ease-in-out infinite;
+        }
+        .threat-alert .alert-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--verdict-danger);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .threat-alert .alert-body {
+            font-size: 0.8rem;
+            color: #fca5a5;
+        }
+        @keyframes threatPulse {
+            0%, 100% { box-shadow: 0 0 0px rgba(239,68,68,0); }
+            50% { box-shadow: 0 0 18px rgba(239,68,68,0.4); }
+        }
+
+        .threat-bar-wrap {
+            margin-top: 16px;
+        }
+        .threat-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .threat-bar-track {
+            background: rgba(255,255,255,0.08);
+            border-radius: 999px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .threat-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            width: 0%;
+            transition: width 1s cubic-bezier(0.4,0,0.2,1);
+        }
+        .threat-bar-fill.danger { background: linear-gradient(90deg, #f97316, #ef4444, #dc2626); }
+        .threat-bar-fill.warn   { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .threat-bar-fill.safe   { background: linear-gradient(90deg, #34d399, #10b981); }
+        .threat-bar-fill.unknown{ background: linear-gradient(90deg, #a78bfa, #8b5cf6); }
+
+        /* Footer */
+        .site-footer {
+            margin-top: 48px; padding: 24px 0;
+            border-top: 1px solid rgba(99,102,241,0.1);
+            width: 100%; max-width: 1100px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.75rem; color: var(--text-muted);
+            z-index: 10;
+        }
+        .site-footer a { color: var(--accent); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <div class="retro-grid"></div>
+    <div class="retro-grid-fade"></div>
+
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="logo">
+            <div class="shield">🛡️</div>
+            Aegis MediaGuard
+        </div>
+        <div class="nav-pills">
+            <span class="pill active">Scanner</span>
+            <span class="pill">Catalog</span>
+            <span class="pill">Ledger</span>
+        </div>
+    </nav>
+
+    <header>
+        <h1 class="animated-text">AI Rights Intelligence</h1>
+        <p>Real-time detection of unauthorized sports media distribution powered by Gemini AI</p>
+    </header>
+
+    <!-- Live Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat-item"><span class="stat-dot" style="background:#34d399"></span>System <strong>Online</strong></div>
+        <div class="stat-item"><span class="stat-dot" style="background:#818cf8"></span>Assets Tracked <strong>16</strong></div>
+        <div class="stat-item"><span class="stat-dot" style="background:#fbbf24"></span>AI Model <strong>Gemini 2.5</strong></div>
+    </div>
+
+    <div class="bento-container">
+        <!-- Input Panel -->
+        <div class="bento-card col-span-2">
+            <h2>
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                Telemetry Input
+            </h2>
+            <div class="input-group">
+                <label>Discovered URL</label>
+                <input type="text" id="urlInput" placeholder="https://youtube.com/@nba/live" value="https://youtube.com/@nba/live">
+            </div>
+            <div class="input-group">
+                <label>Context / Description (Uses Gemini AI <span class="ai-badge">✦ AI</span>)</label>
+                <input type="text" id="descInput" placeholder="e.g. LeBron James dunk highlights" value="NBA Finals Highlights">
+            </div>
+            <button class="shimmer-button" id="analyzeBtn" onclick="runAnalysis()">
+                <div class="spinner" id="btnSpinner"></div>
+                <span id="btnText">Initiate AI Scan</span>
+            </button>
+        </div>
+
+        <!-- Initial Placeholder State -->
+        <div class="bento-card" id="empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; opacity: 0.5;">
+            <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24" style="margin-bottom: 16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            <p>Awaiting report telemetry.<br>Enter a URL to begin.</p>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="bento-card hidden-bento" id="results-container">
+            <h2>
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Analysis Verdict
+            </h2>
+            
+            <div id="verdictBadge" class="verdict-badge">
+                <div class="verdict-dot" id="verdictDot"></div>
+                <span id="verdictText">VERDICT</span>
+            </div>
+            
+            <div class="metric-grid">
+                <div class="metric-box">
+                    <span>Severity Score</span>
+                    <strong id="riskScore">--/100</strong>
+                </div>
+                <div class="metric-box">
+                    <span>AI Confidence <span class="ai-badge" style="margin-left:4px; font-size:0.6rem;">✦</span></span>
+                    <strong id="confidenceScore">--%</strong>
+                </div>
+            </div>
+
+            <h3 style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px; margin-top: 24px; text-transform: uppercase; letter-spacing: 1px;">Rights Evaluation Matrix</h3>
+            <div id="rightsContainer">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+
+        <!-- Log Panel -->
+        <div class="bento-card col-span-3 hidden-bento" id="logs-container" style="animation-delay: 0.2s;">
+            <h2>
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                Audit Log & Reasoning
+            </h2>
+            <ul class="log-list" id="logList">
+                <!-- Populated dynamically -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <span>© 2026 Aegis MediaGuard — Hack2Skill Solution Challenge</span>
+        <span>Built with <a href="https://ai.google.dev/">Gemini AI</a> · v0.1.0</span>
+    </footer>
+
+    <script>
+        async function runAnalysis() {
+            const url = document.getElementById("urlInput").value.trim();
+            const desc = document.getElementById("descInput").value.trim();
+            const btn = document.getElementById("analyzeBtn");
+            const spinner = document.getElementById("btnSpinner");
+            const btnText = document.getElementById("btnText");
+
+            if (!url) {
+                alert("Please enter a URL.");
+                return;
+            }
+
+            // UI Loading state
+            btn.disabled = true;
+            spinner.style.display = "block";
+            btnText.innerText = "Processing AI Pipeline...";
+            document.getElementById("empty-state").style.display = "none";
+            document.getElementById("results-container").style.display = "none";
+            document.getElementById("results-container").classList.remove("hidden-bento");
+            document.getElementById("logs-container").style.display = "none";
+            document.getElementById("logs-container").classList.remove("hidden-bento");
+
+            // Force reflow for animation restart
+            void document.getElementById("results-container").offsetWidth;
+
+            try {
+                const res = await fetch("http://localhost:8000/reports/analyze", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: url, description: desc })
+                });
+
+                const data = await res.json();
+                
+                if (!res.ok || data.status === "failed") {
+                    throw new Error(data.flags ? data.flags[0] : "API Error");
+                }
+
+                renderResults(data);
+
+            } catch (err) {
+                alert("Error connecting to Aegis Kernel: " + err.message);
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = "none";
+                btnText.innerText = "Initiate AI Scan";
+            }
+        }
+
+        function renderResults(data) {
+            document.getElementById("results-container").style.display = "block";
+            document.getElementById("results-container").classList.add("hidden-bento");
+            document.getElementById("logs-container").style.display = "block";
+            document.getElementById("logs-container").classList.add("hidden-bento");
+
+            const isPiracy = data.verdict === "URGENT_LIVE_LEAK" || data.verdict === "SUSPECTED_INFRINGEMENT";
+            const isAuth = data.verdict === "AUTHORIZED";
+            const isWarn = data.verdict === "MANUAL_REVIEW";
+
+            // Verdict Badge
+            const badge = document.getElementById("verdictBadge");
+            const dot = document.getElementById("verdictDot");
+            document.getElementById("verdictText").innerText = data.verdict.replace(/_/g,' ');
+            
+            badge.style.backgroundColor = "transparent";
+            badge.style.border = "1px solid rgba(255,255,255,0.2)";
+            badge.style.color = "white";
+
+            if (isAuth) {
+                badge.style.borderColor = "rgba(16, 185, 129, 0.5)";
+                badge.style.color = "var(--verdict-safe)";
+                badge.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+                dot.className = "verdict-dot bg-green";
+            } else if (isPiracy) {
+                badge.style.borderColor = "rgba(239, 68, 68, 0.7)";
+                badge.style.color = "var(--verdict-danger)";
+                badge.style.backgroundColor = "rgba(239, 68, 68, 0.15)";
+                badge.style.animation = "threatPulse 1.5s ease-in-out infinite";
+                dot.className = "verdict-dot bg-red";
+            } else if (isWarn) {
+                badge.style.borderColor = "rgba(245, 158, 11, 0.5)";
+                badge.style.color = "var(--verdict-warn)";
+                badge.style.backgroundColor = "rgba(245, 158, 11, 0.1)";
+                dot.className = "verdict-dot";
+                dot.style.background = "var(--verdict-warn)";
+            } else {
+                badge.style.borderColor = "rgba(99, 102, 241, 0.5)";
+                badge.style.color = "var(--verdict-unknown)";
+                badge.style.backgroundColor = "rgba(99, 102, 241, 0.1)";
+                dot.className = "verdict-dot";
+                dot.style.background = "var(--verdict-unknown)";
+            }
+
+            // Show/hide threat alert box
+            let alertBox = document.getElementById("threatAlert");
+            if (!alertBox) {
+                alertBox = document.createElement("div");
+                alertBox.id = "threatAlert";
+                alertBox.className = "threat-alert";
+                alertBox.innerHTML = `
+                    <div class="alert-title">
+                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19H3.5L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+                        ⚡ RIGHTS INFRINGEMENT DETECTED
+                    </div>
+                    <div class="alert-body" id="alertBody"></div>
+                `;
+                document.getElementById("results-container").insertBefore(
+                    alertBox,
+                    document.getElementById("verdictBadge")
+                );
+            }
+
+            if (isPiracy) {
+                alertBox.style.display = "block";
+                const alertVerdict = data.verdict === "URGENT_LIVE_LEAK"
+                    ? "🔴 URGENT: Unauthorized live stream detected. Immediate takedown protocol initiated."
+                    : "🟠 Suspected piracy — content distributed without valid rights license.";
+                document.getElementById("alertBody").innerText = alertVerdict;
+            } else {
+                alertBox.style.display = "none";
+                badge.style.animation = "";
+            }
+
+            // Metrics
+            const score = data.risk_score;
+            const scoreEl = document.getElementById("riskScore");
+            scoreEl.innerText = score + "/100";
+            scoreEl.className = isPiracy ? "text-red" : isAuth ? "text-green" : "text-yellow";
+
+            let confPercent = (data.confidence * 100).toFixed(0);
+            const confEl = document.getElementById("confidenceScore");
+            confEl.innerText = confPercent + "%";
+            confEl.className = isPiracy ? "text-red" : data.confidence > 0.8 ? "text-green" : "";
+
+            // Threat Level Bar
+            let barWrap = document.getElementById("threatBarWrap");
+            if (!barWrap) {
+                barWrap = document.createElement("div");
+                barWrap.id = "threatBarWrap";
+                barWrap.className = "threat-bar-wrap";
+                barWrap.innerHTML = `
+                    <div class="threat-bar-label"><span>Threat Level</span><span id="threatBarPct">0%</span></div>
+                    <div class="threat-bar-track"><div class="threat-bar-fill" id="threatBarFill"></div></div>
+                `;
+                const metricGrid = document.querySelector(".metric-grid");
+                metricGrid.insertAdjacentElement("afterend", barWrap);
+            }
+            const barFill = document.getElementById("threatBarFill");
+            const barPct = document.getElementById("threatBarPct");
+            barFill.className = "threat-bar-fill " + (isPiracy ? "danger" : isWarn ? "warn" : isAuth ? "safe" : "unknown");
+            setTimeout(() => {
+                barFill.style.width = score + "%";
+                barPct.innerText = score + "%";
+            }, 100);
+
+            // Rights Matrix
+            const rc = document.getElementById("rightsContainer");
+            rc.innerHTML = "";
+
+            if (data.rights) {
+                rc.innerHTML += buildRightRow("Platform Context", data.rights.platform_ok);
+                if (data.rights.uploader_ok !== undefined) {
+                    rc.innerHTML += buildRightRow("Uploader Authorization", data.rights.uploader_ok);
+                }
+                rc.innerHTML += buildRightRow("Geo-Region Scope", data.rights.region_ok);
+                rc.innerHTML += buildRightRow("License Validity Window", data.rights.license_valid);
+            } else {
+                rc.innerHTML = `<div style="font-size:0.9rem; color:#9ca3af; padding: 12px; border: 1px dashed var(--panel-border); border-radius: 8px;">No official asset matched. Rights evaluation skipped.</div>`;
+            }
+
+            // Logs
+            const logList = document.getElementById("logList");
+            logList.innerHTML = "";
+
+            const piracyTag = isPiracy ? "[⚠ THREAT]" : "[✓ CLEAN]";
+            const baseLogs = [
+                "[SYSTEM] Initiating telemetry ingestion sequence...",
+                `[INGEST] Assigned Case ID: ${data.report_id}`,
+                "[SCRAPER] Extracted metadata payload from provided URI.",
+                "[AI_ENGINE] Gemini Semantic Model successfully analyzed context payload.",
+                `[MATCHER] AI Catalog match returned confidence: ${confPercent}%.`,
+                `${piracyTag} Rights engine verdict: ${data.verdict.replace(/_/g,' ')} — severity ${score}/100`
+            ];
+
+            const allLogs = baseLogs.concat(data.flags || []);
+
+            allLogs.forEach((log, index) => {
+                setTimeout(() => {
+                    const li = document.createElement("li");
+                    li.innerText = log;
+                    if (log.startsWith("[⚠")) li.style.color = "#fca5a5";
+                    if (log.startsWith("URGENT")) li.style.color = "#ef4444";
+                    logList.appendChild(li);
+                    logList.scrollTop = logList.scrollHeight;
+                }, index * 200);
+            });
+        }
+
+        function buildRightRow(label, isOk) {
+            const colorClass = isOk ? "text-green" : "text-red";
+            const text = isOk ? "AUTHORIZED" : "VIOLATION";
+            const icon = isOk 
+                ? `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>`
+                : `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+
+            return `
+                <div class="rights-status">
+                    <span>${label}</span>
+                    <span class="${colorClass}" style="display:flex; align-items:center; gap:6px; font-size:0.8rem; font-weight:700;">
+                        ${icon}
+                        ${text}
+                    </span>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

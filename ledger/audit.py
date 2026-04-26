@@ -19,7 +19,9 @@ _LEDGER_TS_STRINGS: list[str] = []
 _GENESIS_HASH = "0" * 64
 
 
-def _compute_hash(seq: int, timestamp: str, event_type: str, event_data: dict, prev_hash: str) -> str:
+def _compute_hash(
+    seq: int, timestamp: str, event_type: str, event_data: dict, prev_hash: str
+) -> str:
     """Deterministically hash one ledger entry."""
     payload = json.dumps(
         {
@@ -58,7 +60,9 @@ def append_event(event_type: EvidenceEvent, event_data: dict[str, Any]) -> Ledge
     timestamp_str = now.isoformat()
     prev_hash = _LEDGER[-1].entry_hash if _LEDGER else _GENESIS_HASH
 
-    entry_hash = _compute_hash(seq, timestamp_str, event_type.value, event_data, prev_hash)
+    entry_hash = _compute_hash(
+        seq, timestamp_str, event_type.value, event_data, prev_hash
+    )
 
     entry = LedgerEntry(
         seq=seq,
@@ -98,8 +102,8 @@ def verify_chain() -> LedgerVerifyResult:
                 entry_count=len(_LEDGER),
                 first_broken_seq=entry.seq,
                 message=f"Chain broken at seq {entry.seq}: "
-                        f"expected prev_hash {expected_prev[:16]}… "
-                        f"but found {entry.prev_hash[:16]}…",
+                f"expected prev_hash {expected_prev[:16]}… "
+                f"but found {entry.prev_hash[:16]}…",
             )
 
         # Recompute this entry's hash using the original timestamp string

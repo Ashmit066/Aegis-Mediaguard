@@ -6,7 +6,7 @@ Each function returns a (passed: bool, reason: str) tuple for structured output.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timezone
 
 from app.models import IncomingReport, OfficialAsset
 
@@ -25,10 +25,52 @@ def check_platform(report: IncomingReport, asset: OfficialAsset) -> tuple[bool, 
     )
 
 
+def check_uploader(report: IncomingReport, asset: OfficialAsset) -> tuple[bool, str]:
+    """
+    Verify the report's uploader is authorized if the platform relies on UGC (user-generated content).
+    """
+    # Direct broadcasters are intrinsically authorized
+    UGC_PLATFORMS = [
+        "youtube",
+        "twitter",
+        "instagram",
+        "facebook",
+        "tiktok",
+        "reddit",
+        "vimeo",
+        "dailymotion",
+        "telegram",
+    ]
+    if report.platform not in UGC_PLATFORMS:
+        return True, f"Direct broadcaster '{report.platform}' assumes uploader trust"
+
+    authorized = [u.lower() for u in asset.authorized_uploaders]
+    if not authorized:
+        return True, "No specific uploader restrictions defined"
+
+    handle = (report.uploader_handle or "anonymous").lower()
+    if handle in authorized:
+        return True, f"Uploader '{report.uploader_handle}' is an official account"
+
+    return (
+        False,
+        f"Uploader '{report.uploader_handle}' is NOT authorized; "
+        f"official accounts: {asset.authorized_uploaders}",
+    )
+
+
 def check_region(report: IncomingReport, asset: OfficialAsset) -> tuple[bool, str]:
     """
     Verify the report's geo_country is in the asset's authorized region list.
+    Official uploaders on UGC platforms (e.g. @NBA on YouTube) broadcast globally —
+    so if the uploader is verified official, we skip the region restriction.
     """
+    # If uploader is official, bypass geo restriction (they broadcast globally)
+    if report.uploader_handle and report.uploader_handle != "anonymous":
+        authorized_uploaders = [u.lower() for u in asset.authorized_uploaders]
+        if report.uploader_handle.lower() in authorized_uploaders:
+            return True, f"Official uploader '{report.uploader_handle}' — geo restriction bypassed (global broadcast)"
+
     authorized = [r.upper() for r in asset.authorized_regions]
     if report.geo_country in authorized:
         return True, f"Region '{report.geo_country}' is authorized"
