@@ -576,7 +576,10 @@
             void document.getElementById("results-container").offsetWidth;
 
             try {
-                const res = await fetch("http://localhost:8000/reports/analyze", {
+                const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'http://localhost:8000'
+                    : window.location.origin;
+                const res = await fetch(apiBase + "/reports/analyze", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ url: url, description: desc })

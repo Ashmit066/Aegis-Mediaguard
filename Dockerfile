@@ -9,8 +9,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY . .
 
-# Expose port for Cloud Run
-EXPOSE 8000
+# Cloud Run injects PORT env var (default 8080)
+ENV PORT=8080
+EXPOSE ${PORT}
 
-# Start server
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start server — Cloud Run requires listening on $PORT
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
